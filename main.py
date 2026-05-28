@@ -21,45 +21,42 @@ class AppState:
         self.api = Playwright(config=config)
 
 
+# 导入需要处理的文件
+async def handle_import_file(_: ft.Event[ft.Button], db: DBConn):
+    """模拟数据导入"""
+    # 这里可以放置实际的数据导入逻辑，例如从文件或数据库加载数据
+    files = await ft.FilePicker().pick_files(
+        dialog_title="选择文件进行导入",
+        allowed_extensions=["xlsx"],
+    )
+
+    for file in files:
+        wb = load_workbook(file.path)  # 这里可以根据需要处理 Excel 文件
+        for ws in wb.worksheets:
+            for row in ws.iter_rows(min_row=1, values_only=True):
+                if len(row) < 7:
+                    continue  # 确保行数据足够
+
+                origin_id = row[1]
+                origin_shop_name = row[1]
+                origin_primary_image_link = row[2]
+                origin_price = row[6]
+
+                db.create_sku(
+                    SKU(
+                        origin_id=origin_id,
+                        origin_shop_name=origin_shop_name,
+                        origin_primary_image_link=origin_primary_image_link,
+                        origin_price=origin_price,
+                    )
+                )
+
+
 @ft.component
 def App(log_viewer: LogViewer) -> ft.Row:
 
-    page = ft.use_page()
+    # 全局状态
     app, _ = ft.use_state(AppState(BrowserConfig(ali1688_path="ali1688")))
-    db = app.db
-    _picker = ft.use_ref()
-
-    # 初始化 FilePicker（只执行一次）
-    if _picker.current is None:
-
-        def _on_result(e: ft.FilePickerResultEvent):
-            if e.files is None:
-                return
-            for f in e.files:
-                wb = load_workbook(f.path)
-                for ws in wb.worksheets:
-                    for row in ws.iter_rows(min_row=1, values_only=True):
-                        if len(row) < 7:
-                            continue
-                        db.create_sku(
-                            SKU(
-                                origin_id=row[1],
-                                origin_shop_name=row[1],
-                                origin_primary_image_link=row[2],
-                                origin_price=row[6],
-                            )
-                        )
-
-        picker = ft.FilePicker(on_result=_on_result)
-        page.overlay.append(picker)
-        page.update()
-        _picker.current = picker
-
-    async def _on_import_click(e):
-        await _picker.current.pick_files(
-            dialog_title="选择文件进行导入",
-            allowed_extensions=["xlsx"],
-        )
 
     return ft.Row(
         controls=[
@@ -69,7 +66,7 @@ def App(log_viewer: LogViewer) -> ft.Row:
                         ft.Button(
                             "导入",
                             icon=ft.Icons.UPLOAD_FILE,
-                            on_click=_on_import_click,
+                            on_click=lambda _: handle_import_file(_, app.db),
                         ),
                         ft.Divider(),
                         ft.Column(

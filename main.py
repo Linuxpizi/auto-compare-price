@@ -47,9 +47,13 @@ async def handle_import_file(_: ft.Event[ft.Button]):
 @ft.component
 def App(playwright: Playwright) -> ft.Row:
     return ft.Row(
+        expand=True,
+        vertical_alignment=ft.CrossAxisAlignment.STRETCH,
         controls=[
             ft.Container(
+                expand=7,
                 content=ft.Column(
+                    expand=True,
                     controls=[
                         ft.Button(
                             "导入",
@@ -58,6 +62,7 @@ def App(playwright: Playwright) -> ft.Row:
                         ),
                         ft.Divider(),
                         ft.Column(
+                            expand=True,
                             controls=[
                                 Table(
                                     [
@@ -109,25 +114,25 @@ def App(playwright: Playwright) -> ft.Row:
                                     ]
                                 )
                             ],
-                            height=1200,
                             scroll=ft.ScrollMode.AUTO,
                         ),
-                    ]
-                ),
-                bgcolor=ft.Colors.YELLOW,
-                border=ft.Border.all(color=ft.Colors.ORANGE_900),
-            ),
-            ft.Container(
-                content=ft.Column(
-                    controls=[
-                        ft.Container(
-                            content=Crawler(db, playwright),
-                            bgcolor=ft.Colors.RED,
-                        ),
-                        ft.Container(content=LogViewer(), bgcolor=ft.Colors.GREEN),
                     ],
                 ),
-                bgcolor=ft.Colors.PURPLE,
+            ),
+            ft.Container(
+                expand=3,
+                content=ft.Column(
+                    expand=True,
+                    controls=[
+                        ft.Container(
+                            expand=True,
+                            content=Crawler(db, playwright),
+                        ),
+                        ft.Container(
+                            content=LogViewer(),
+                        ),
+                    ],
+                ),
             ),
         ],
     )

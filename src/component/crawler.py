@@ -28,26 +28,64 @@ class Crawler(ft.Column):
         self.controls = [
             ft.Row(
                 controls=[
-                    ft.Button("登录1688", on_click=self.handle_login_1688),
-                    ft.Button("验证登录状态", on_click=self.handle_check_login_1688),
+                    ft.Button(
+                        "开始采集",
+                        on_click=self.handle_start_crawler,
+                        color=ft.Colors.WHITE,
+                        bgcolor=ft.Colors.BLUE_600,
+                    ),
+                    ft.Button(
+                        "停止采集",
+                        on_click=self.handle_stop_crawler,
+                        color=ft.Colors.WHITE,
+                        bgcolor=ft.Colors.RED_600,
+                    ),
                 ],
-            ),
-            ft.Row(
-                controls=[
-                    ft.Column(
-                        ft.Text("比价参数设定"),
-                        ft.Divider(),
-                        ft.Switch("一件代发", True),
-                        ft.TextField("1.2"),
-                    )
-                ]
-            ),
-            ft.Row(
-                controls=[
-                    ft.Button("开始采集", on_click=self.handle_start_crawler),
-                    ft.Button("停止采集", on_click=self.handle_stop_crawler),
-                ],
+                alignment=ft.MainAxisAlignment.START,
             ),  # 登录 1688
+            ft.Row(
+                controls=[
+                    ft.Button(
+                        "登录1688",
+                        on_click=self.handle_login_1688,
+                        color=ft.Colors.WHITE,
+                        bgcolor=ft.Colors.BLUE_600,
+                    ),
+                    ft.Button(
+                        "登录状态",
+                        on_click=self.handle_check_login_1688,
+                        color=ft.Colors.WHITE,
+                        bgcolor=ft.Colors.RED_600,
+                    ),
+                ],
+                alignment=ft.MainAxisAlignment.START,
+            ),
+            ft.Column(
+                controls=[
+                    ft.Text(
+                        "比价参数设定",
+                        size=18,
+                        bgcolor=ft.Colors.BLACK,
+                        color=ft.Colors.WHITE,
+                    ),
+                    ft.Divider(),
+                    ft.Row(
+                        controls=[
+                            ft.Switch(
+                                label="一件代发",  # 使用 label 参数
+                                value=True,  # 使用 value 参数
+                                expand=6,
+                            ),
+                            ft.TextField(
+                                label="比价系数",
+                                value="1.2",
+                                expand=4,
+                            ),
+                        ],
+                        #     expand=True,
+                    ),
+                ],
+            ),
         ]
 
     # 是否已登录,规则是查找是否有已登陆的标志

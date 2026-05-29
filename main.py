@@ -51,7 +51,7 @@ def App(playwright: Playwright) -> ft.Row:
         vertical_alignment=ft.CrossAxisAlignment.STRETCH,
         controls=[
             ft.Container(
-                expand=7,
+                expand=8,
                 content=ft.Column(
                     expand=True,
                     controls=[
@@ -59,6 +59,8 @@ def App(playwright: Playwright) -> ft.Row:
                             "导入",
                             icon=ft.Icons.UPLOAD_FILE,
                             on_click=handle_import_file,
+                            color=ft.Colors.WHITE,
+                            bgcolor=ft.Colors.BLUE_600,
                         ),
                         ft.Divider(),
                         ft.Column(
@@ -120,15 +122,16 @@ def App(playwright: Playwright) -> ft.Row:
                 ),
             ),
             ft.Container(
-                expand=3,
+                expand=2,
                 content=ft.Column(
                     expand=True,
                     controls=[
                         ft.Container(
-                            expand=True,
+                            expand=3,
                             content=Crawler(db, playwright),
                         ),
                         ft.Container(
+                            expand=7,
                             content=LogViewer(),
                         ),
                     ],

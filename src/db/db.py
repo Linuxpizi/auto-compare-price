@@ -1,6 +1,7 @@
 import sqlite3
 from typing import List, Optional
 from dataclasses import dataclass, field
+from os import path
 
 sku_table = """
 CREATE TABLE IF NOT EXISTS sku (
@@ -37,7 +38,9 @@ class SKU:
     match_image_link: float = field(default=0.0)
     match_score: float = field(default=0.0)
 
-    status: int = field(default=0)  # 0 - 待处理, 1 - 已处理
+    status: int = field(
+        default=0
+    )  # 0 - 待处理, 1 - 已处理，2 - 已导出(已比对完成，导出 excel)， 99 - 删除
 
     def to_tuple(self):
         return (
@@ -52,13 +55,15 @@ class SKU:
 
 
 class DBConn:
-    def __init__(self, db_path: str = "storage/.sku.db"):
+    def __init__(self, db_path: str = "storage/db", db_name=".sku.db"):
         """
         Initialize a database connection.
         Args:
             db_path (str): Path to the SQLite database file.
         """
-        self.connection: sqlite3.Connection = sqlite3.connect(db_path)
+        self.connection: sqlite3.Connection = sqlite3.connect(
+            path.join(db_path, db_name)
+        )
         self.connection.execute("PRAGMA journal_mode=WAL;")
         self.connection.execute("PRAGMA synchronous=NORMAL;")
 
@@ -239,7 +244,8 @@ class DBConn:
             FROM
                 sku
             WHERE
-                1 == 1 limit {limit if limit > 0 else 1000}
+                1 == 1
+            LIMIT {limit if limit > 0 else 1000}
             """)
         skus = cursor.fetchall()
         out: List[SKU] = []
@@ -258,6 +264,7 @@ class DBConn:
             )
         return out
 
+    # 获取随机 SKU
     async def get_random_sku(self) -> Optional[SKU]:
         cursor = self.connection.cursor()
         cursor = cursor.execute(

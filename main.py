@@ -1,28 +1,20 @@
-from dataclasses import dataclass, field
-
 import flet as ft
 from openpyxl import load_workbook
 
-from src.resnet_similarity import ResNetSimilarityEngine
+from src.similarity.resnet_similarity import ResNetSimilarityEngine
 from src.db.db import DBConn, SKU
 from src.api.api import Playwright, BrowserConfig
 from src.component.log_viewer import LogViewer
 from src.component.table import Table
 from src.component.crawler import Crawler
 
-
-# 数据库和自动化操作
-@ft.observable
-@dataclass
-class AppState:
-    def __init__(self, config: BrowserConfig):
-        super().__init__()
-        self.db = DBConn()
-        self.api = Playwright(config=config)
+# 全局数据
+db = DBConn()
+playwright = Playwright(config=BrowserConfig(headless=False))
 
 
 # 导入需要处理的文件
-async def handle_import_file(_: ft.Event[ft.Button], db: DBConn):
+async def handle_import_file(_: ft.Event[ft.Button]):
     """模拟数据导入"""
     # 这里可以放置实际的数据导入逻辑，例如从文件或数据库加载数据
     files = await ft.FilePicker().pick_files(
@@ -53,11 +45,7 @@ async def handle_import_file(_: ft.Event[ft.Button], db: DBConn):
 
 
 @ft.component
-def App(log_viewer: LogViewer) -> ft.Row:
-
-    # 全局状态
-    app, _ = ft.use_state(AppState(BrowserConfig(ali1688_path="ali1688")))
-
+def App(playwright: Playwright) -> ft.Row:
     return ft.Row(
         controls=[
             ft.Container(
@@ -66,7 +54,7 @@ def App(log_viewer: LogViewer) -> ft.Row:
                         ft.Button(
                             "导入",
                             icon=ft.Icons.UPLOAD_FILE,
-                            on_click=lambda _: handle_import_file(_, app.db),
+                            on_click=handle_import_file,
                         ),
                         ft.Divider(),
                         ft.Column(
@@ -126,7 +114,6 @@ def App(log_viewer: LogViewer) -> ft.Row:
                         ),
                     ]
                 ),
-                expand=7,
                 bgcolor=ft.Colors.YELLOW,
                 border=ft.Border.all(color=ft.Colors.ORANGE_900),
             ),
@@ -134,33 +121,28 @@ def App(log_viewer: LogViewer) -> ft.Row:
                 content=ft.Column(
                     controls=[
                         ft.Container(
-                            content=Crawler(app.db, app.api),
-                            expand=2,
+                            content=Crawler(db, playwright),
                             bgcolor=ft.Colors.RED,
                         ),
-                        ft.Container(
-                            content=log_viewer, expand=8, bgcolor=ft.Colors.GREEN
-                        ),
+                        ft.Container(content=LogViewer(), bgcolor=ft.Colors.GREEN),
                     ],
-                    alignment=ft.MainAxisAlignment.START,  # 列内内容从顶部开始排列
-                    horizontal_alignment=ft.CrossAxisAlignment.CENTER,
                 ),
-                expand=True,
                 bgcolor=ft.Colors.PURPLE,
             ),
         ],
     )
 
 
-def main(page: ft.Page):
+async def main(page: ft.Page):
     page.title = "SKU 比价工具"
 
     page.window.width = 1100
     page.window.min_width = 1100
     page.window.min_height = 600
 
-    log_viewer = LogViewer()  # 创建日志查看器实例
-    page.render(lambda: App(log_viewer))
+    # 初始化自动化环境
+    await playwright.setup()
+    page.render(lambda: App(playwright))
 
 
 if __name__ == "__main__":

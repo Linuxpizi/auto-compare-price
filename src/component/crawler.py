@@ -1,22 +1,36 @@
 import io
+from asyncio import sleep
+from random import random
 
 import flet as ft
 from PIL import Image
+
 from src.db.db import DBConn
 from src.api.api import Playwright
+from src.similarity.resnet_similarity import ResNetSimilarityEngine
 
 
 @ft.control
 class Crawler(ft.Column):
-    def __init__(self, db: DBConn, playwright: Playwright):
+    def __init__(
+        self,
+        db: DBConn,
+        playwright: Playwright,
+        price_ratio_factor: float = 1.2,
+        dropshipping: bool = True,
+    ):
         super().__init__()
 
-        # 比价中
-        self.comparing: bool = False
-        # 停止中
+        # 停止比价
         self.stopping: bool = False
         self.db: DBConn = db
         self.playwright: Playwright = playwright
+
+        # 比价参数设置
+        # 比价系数
+        self.price_ratio_factor: float = price_ratio_factor
+        # 一件代发
+        self.dropshipping = dropshipping
 
         # 构建 UI 界面
         self._build_ui()
@@ -88,14 +102,18 @@ class Crawler(ft.Column):
             ),
         ]
 
+    # 随机延时 1. 等待页面记载 2. 模拟
+    async def await_sleep(delay: float = 0.0):
+        sleep(random() + delay)
+
     # 是否已登录,规则是查找是否有已登陆的标志
     # 已登录 -> True
     # 未登录 -> False
     async def already_logined(self) -> bool:
         await self.playwright.goto_home_page()
+        await self.await_sleep(0.2)
 
         # Shadow DOM 不能使用 xpath 定位
-
         # login_item = self.playwright.ali1688_page.locator(
         #     "div.userInfo workbench-i18n.title[name='AlibarMe.Login']"
         # )
@@ -131,6 +149,17 @@ class Crawler(ft.Column):
         except Exception as e:
             self.show_dialog("登录检查", f"检查异常，请稍后重试 {e}", ft.Colors.RED)
 
+    # 剪切板
+    async def clipboard(self, link: str):
+        try:
+            await self.playwright.ali1688_page.evaluate(
+                f"navigator.clipboard.writeText('{link}')"
+            )
+            await self.await_sleep()
+            await self.playwright.ali1688_page.keyboard.press("Control+V")
+        except Exception as e:
+            self.show_dialog("查找相似图", f"设置剪切板找图异常 {e}", ft.Colors.RED)
+
     # 登录
     async def handle_login_1688(self, e):
         try:
@@ -142,6 +171,7 @@ class Crawler(ft.Column):
 
             # 进入登录页
             await self.playwright.goto_login_page()
+            await self.await_sleep(0.2)
 
             # 登录二维码元素
             qr_code = self.playwright.ali1688_page.locator(
@@ -160,17 +190,66 @@ class Crawler(ft.Column):
 
     # 开始采集
     async def handle_start_crawler(self, e):
+        self.stopping = False
         # 开始比价
-        self.comparing = True
-        while self.comparing:
-            for sku in self.db.get_random_sku():
-                # 1. 进入主页
-                # 2. 复制/粘贴
-                # 3. 搜索 //div[@class='copy-image-container']//div[@data-tracker="pasteImagePreview"]
-                # 4. 匹配
-                pass
+        while True:
+            sku = self.db.get_compare_sku()
+            if sku:
+                # 搜图网络监控
+                await self.playwright.watch_similarity_sku_network()
 
+                # 1. 进入主页
+                await self.playwright.goto_home_page()
+                await self.await_sleep(0.1)
+
+                # 2. 复制/粘贴
+                await self.clipboard(sku.origin_primary_image_link)
+                # 3. 搜索 //div[@class='copy-image-container']//div[@data-tracker="pasteImagePreview"]
+                # 这里操作完成后，需要捕获数据，目前采集前 12 调数据
+                await self.await_sleep(0.2)
+                await self.search_image()
+
+                # 选择一件代发
+                if self.dropshipping:
+                    
+
+                # 4. 匹配
+                engine = ResNetSimilarityEngine(model_name="resnet50", use_gpu=False)
+
+                # 2. 场景一：比较两张图片
+                print("\n" + "=" * 60)
+                print("场景一：比较两张图片")
+                print("=" * 60)
+
+                # sim = engine.compare_pair(
+                #     "src/asserts/images/c0.webp", "src/asserts/images/c3.webp", method="cosine"
+                # )
+                # print(f"✅ 余弦相似度: {sim:.4f} ({sim*100:.2f}%)")
+
+                sim2 = engine.compare_pair("./111.jpg", "./2222.webp", method="cosine")
+
+                if self.stopping:
+                    # 模态框处理
+                    self.stopping = False
+                    break
+
+    async def search_image(self):
+        search_image_item = self.playwright.ali1688_page.locator(
+            "xpath=//div[@class='copy-image-container']//div[@data-tracker='pasteImagePreview']"
+        )
+
+        await search_image_item.click(delay=random())
+
+    async def set_dropshipping(self):
+        dropshipping_item = self.playwright.ali1688_page.locator(
+            "xpath=//div[@id='root-container']//div[starts-with(@class, 'filterBottomContainer')]//div[starts-with(@class, 'bottomFilterOption')][3]"
+        )
+
+        # 等待页面加载完成
+        await self.await_sleep(1)
+        await dropshipping_item.click(delay=random())
+    
     # 停止采集
     async def handle_stop_crawler(self, e):
-        print("停止采集")
-        self.comparing = True
+        self.stopping = True
+        # 显示模态弹窗

@@ -1,7 +1,6 @@
 import flet as ft
 from openpyxl import load_workbook
 
-from src.similarity.resnet_similarity import ResNetSimilarityEngine
 from src.db.db import DBConn, SKU
 from src.api.api import Playwright, BrowserConfig
 from src.component.log_viewer import LogViewer

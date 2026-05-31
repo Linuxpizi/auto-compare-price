@@ -97,16 +97,44 @@ class Playwright:
         if hasattr(self, "playwright"):
             await self.playwright.close()
 
-    # 监控网络--------------------
-    async def handle_watch_network(response: Response):
-        # response.
-        pass
+    # # 监控网络--------------------
+    async def _handle_watch_sku_network(response: Response):
+        # 单个 SKU 详情
+        if (
+            "mtop.1688.wosc.queryofferskuselectormodel" in response.request.url
+            and response.ok
+        ):
+            content_type = response.headers.get("content-type")
+            if "application/json" in content_type:
+                try:
+                    # 3. 在try块中安全地解析JSON
+                    data = await response.json()
+                    print("API数据:", data)
+                except Exception as e:
+                    print(f"JSON解析失败: {e}")
 
-    # 全局初始化一次
-    async def watch_network(self):
-        await self.ali1688_page.on("response", self.handle_watch_network)
+    async def watch_sku_network(self):
+        await self.ali1688_page.once("response", self._handle_watch_sku_network)
 
-    # 监控网络--------------------end
+    async def _handle_watch_similarity_sku_network(response: Response):
+        # 单个 SKU 详情
+        if (
+            "mtop.relationrecommend.wirelessrecommend.recommend" in response.request.url
+            and response.ok
+        ):
+            content_type = response.headers.get("content-type")
+            if "application/json" in content_type:
+                try:
+                    # 3. 在try块中安全地解析JSON
+                    data = await response.json()
+                    print("API数据:", data)
+                except Exception as e:
+                    print(f"JSON解析失败: {e}")
+
+    async def watch_similarity_sku_network(self):
+        await self.ali1688_page.once("response", self._handle_watch_similarity_sku_network)
+
+    # # 监控网络--------------------end
 
     # 基础功能
     # 1. 登录页
@@ -117,12 +145,6 @@ class Playwright:
     async def goto_home_page(self):
         await self.ali1688_page.goto(ALI1688_HOME, wait_until="load")
 
-    # 3. 是否已登陆
-    async def check_already_login(
-        self, home_url: str, check_selector: str, timeout: int = 5000
-    ) -> bool:
-        pass
-
     # 4. 登录
 
     # 5. 搜索图片(在 1688 主页，复制的任何图片链接，都会触发搜索图片弹窗)
@@ -131,70 +153,6 @@ class Playwright:
     # 2. 只选择最靠前的数据(前 20)，进行相似度比对，过滤相似度(80%以上的，然后其中选择匹配度最高的)
     # 3. 进入对应的详情页，选择匹配度最高的 SKU，进行价格比对(1.2倍)
     # 4. 留下符合条件的数据
-
-    async def get_qr_code(self, home_url: str) -> bytes:
-        """
-        获取二维码图像
-        """
-        if not await self.check_login():
-            import base64
-            from PIL import Image
-            from io import BytesIO
-
-            await self.ali1688_page.goto(home_url, wait_until="networkidle")
-            account = await self.ali1688_page.wait_for_selector(
-                "xpath=//div[@class='account-type__item__title']", timeout=5000
-            )
-            await account.click()
-
-            qrcode = await self.ali1688_page.wait_for_selector(
-                "xpath=//div[@class='qrcodeImage___Gg2hK']/img", timeout=1000
-            )
-            # 去掉前缀
-            header, encoded = await qrcode.get_attribute("src").split(",", 1)
-
-            # 解码 Base64
-            data = base64.b64decode(encoded)
-
-            # 将数据转换为图像
-            image = Image.open(BytesIO(data))
-
-            # 保存图像为 PNG 文件
-            image.show()
-
-        return True
-
-    async def qr_code_login(self, home_url: str) -> bool:
-        """
-        通过二维码扫码登录
-        """
-        if not await self.check_login():
-            import base64
-            from PIL import Image
-            from io import BytesIO
-
-            await self.ali1688_page.goto(home_url, wait_until="networkidle")
-            account = await self.ali1688_page.wait_for_selector(
-                "xpath=//div[@class='account-type__item__title']", timeout=5000
-            )
-            await account.click()
-
-            qrcode = await self.ali1688_page.wait_for_selector(
-                "xpath=//div[@class='qrcodeImage___Gg2hK']/img", timeout=1000
-            )
-            # 去掉前缀
-            header, encoded = await qrcode.get_attribute("src").split(",", 1)
-
-            # 解码 Base64
-            data = base64.b64decode(encoded)
-
-            # 将数据转换为图像
-            image = Image.open(BytesIO(data))
-
-            # 保存图像为 PNG 文件
-            image.show()
-
-        return True
 
 
 if __name__ == "__main__":

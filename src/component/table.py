@@ -29,7 +29,7 @@ def TableRows(rows: List[SKU]) -> List[DataRow2]:
                     expand=3,
                 ),
                 ft.DataCell(
-                    ft.ElevatedButton(
+                    ft.Button(
                         content=ft.Image(
                             src=row.match_image_link,
                             fit=ft.BoxFit.CONTAIN,

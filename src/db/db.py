@@ -13,6 +13,7 @@ CREATE TABLE IF NOT EXISTS sku (
     match_link TEXT NOT NULL DEFAULT '',
     match_image_link TEXT NOT NULL DEFAULT '',
     match_score TEXT NOT NULL DEFAULT '',
+    match_remark TEXT NOT NULL DEFAULT '',
 
     status INTEGER DEFAULT 0,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -37,7 +38,8 @@ class SKU:
     match_link: str = field(default="")
     match_image_link: float = field(default=0.0)
     match_score: float = field(default=0.0)
-
+    match_remark: str = field(default="") # 价格说明 1. 物流 2. 两件优惠 3. 促销活动折扣
+    
     status: int = field(
         default=0
     )  # 0 - 待处理, 1 - 已处理，2 - 已导出(已比对完成，导出 excel)， 99 - 删除
@@ -51,6 +53,8 @@ class SKU:
             self.match_link,
             self.match_image_link,
             self.match_score,
+            self.match_remark,
+
         )  # 转换为元组
 
 
@@ -90,7 +94,7 @@ class DBConn:
         self.connection.commit()
         cursor.close()
 
-    async def create_sku(self, info: SKU):
+    def create_sku(self, info: SKU):
         try:
             conn = self.connection
             cursor = conn.cursor()
@@ -104,10 +108,11 @@ class DBConn:
                     
                     match_link,
                     match_image_link,
-                    match_score
+                    match_score,
+                    match_remark
                 )
                 VALUES
-                    (?, ?, ?, ?, ?, ?, ?)
+                    (?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(origin_id)
                 DO NOTHING
                 """,
@@ -119,6 +124,7 @@ class DBConn:
                     info.match_link,
                     info.match_image_link,
                     info.match_score,
+                    info.match_remark,
                 ),
             )
             conn.commit()
@@ -144,10 +150,11 @@ class DBConn:
                     
                     match_link,
                     match_image_link,
-                    match_score
+                    match_score,
+                    match_remark
                 )
                 VALUES
-                    (?, ?, ?, ?, ?, ?, ?)
+                    (?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(origin_id)
                 DO NOTHING
                 """,
@@ -161,7 +168,7 @@ class DBConn:
                 e,
             )
 
-    async def delete_sku(self, origin_id: str = ""):
+    def delete_sku(self, origin_id: str = ""):
         conn = self.connection
         cursor = conn.cursor()
         cursor = cursor.execute(
@@ -178,7 +185,7 @@ class DBConn:
         conn.commit()
         cursor.close()
 
-    async def modify_sku_status(
+    def modify_sku_status(
         self,
         origin_id: str,
     ):
@@ -199,7 +206,7 @@ class DBConn:
         conn.commit()
         cursor.close()
 
-    async def get_sku(self, origin_id: str) -> Optional[SKU]:
+    def get_sku(self, origin_id: str) -> Optional[SKU]:
         cursor = self.connection.cursor()
         cursor = cursor.execute(
             """
@@ -212,6 +219,7 @@ class DBConn:
                     match_link,
                     match_image_link,
                     match_score,
+                    match_remark,
                     
                     status
                 FROM
@@ -239,6 +247,7 @@ class DBConn:
                 match_link,
                 match_image_link,
                 match_score,
+                match_remark,
             
                 status
             FROM
@@ -259,27 +268,20 @@ class DBConn:
                     match_link=row[4],
                     match_image_link=row[5],
                     match_score=row[6],
-                    status=row[7],
+                    match_remark=row[7],
+                    status=row[8],
                 )
             )
         return out
 
     # 获取随机 SKU
-    async def get_random_sku(self) -> Optional[SKU]:
+    def get_compare_sku(self) -> Optional[SKU]:
         cursor = self.connection.cursor()
         cursor = cursor.execute(
             """
                 SELECT
                     origin_id,
-                    origin_shop_name,
-                    origin_primary_image_link,
-                    origin_price,
-                    
-                    match_link,
-                    match_image_link,
-                    match_score,
-                
-                    status
+                    origin_primary_image_link
                 FROM
                     sku
                 WHERE

@@ -228,22 +228,22 @@ class ResNetSimilarityEngine:
         self.calculator = SimilarityCalculator()
 
     def compare_pair(
-        self, img1_path: str, img2_path: str, method: str = "cosine"
+        self, src_image: str, target_image: str, method: str = "cosine"
     ) -> float:
         """
         比较两张图片的相似度
 
         Args:
-            img1_path: 图片1路径
-            img2_path: 图片2路径
+            src_image: 图片1路径
+            target_image: 图片2路径
             method: 相似度计算方法 (cosine, euclidean, pearson)
 
         Returns:
             相似度得分 [0, 1]，1表示完全相似
         """
         # 提取特征
-        feat1 = self.extractor.extract(img1_path)
-        feat2 = self.extractor.extract(img2_path)
+        feat1 = self.extractor.extract(src_image)
+        feat2 = self.extractor.extract(target_image)
 
         # 计算相似度
         if method == "cosine":
@@ -259,8 +259,8 @@ class ResNetSimilarityEngine:
 
     def compare_query_to_targets(
         self,
-        query_path: str,
-        target_paths: List[str],
+        query_image: str,
+        target_images: List[str],
         method: str = "cosine",
         sort: bool = True,
     ) -> List[Tuple[str, float]]:
@@ -276,13 +276,13 @@ class ResNetSimilarityEngine:
         Returns:
             [(图片路径, 相似度得分), ...]
         """
-        print(f"📷 提取查询图片特征: {query_path}")
-        query_feat = self.extractor.extract(query_path)
+        print(f"📷 提取查询图片特征: {query_image}")
+        query_feat = self.extractor.extract(query_image)
 
         results = []
-        total = len(target_paths)
+        total = len(target_images)
 
-        for i, target_path in enumerate(target_paths, 1):
+        for i, target_path in enumerate(target_images, 1):
             print(f"🔄 处理目标图片 [{i}/{total}]: {target_path}")
 
             try:
@@ -310,7 +310,7 @@ class ResNetSimilarityEngine:
         return results
 
     def compare_matrix(
-        self, image_paths: List[str], method: str = "cosine"
+        self, images: List[str], method: str = "cosine"
     ) -> np.ndarray:
         """
         计算多张图片之间的相似度矩阵
@@ -322,12 +322,12 @@ class ResNetSimilarityEngine:
         Returns:
             相似度矩阵 (n, n)，其中matrix[i][j]表示第i张和第j张的相似度
         """
-        n = len(image_paths)
+        n = len(images)
         similarity_matrix = np.zeros((n, n))
 
         # 批量提取所有特征
         print(f"📷 提取 {n} 张图片的特征...")
-        features = self.extractor.extract_batch(image_paths)
+        features = self.extractor.extract_batch(images)
 
         # 计算相似度矩阵
         print("📊 计算相似度矩阵...")
@@ -444,7 +444,7 @@ def main():
 
 
 # ========== 便捷函数（直接调用） ==========
-def quick_compare(img1: str, img2: str, model: str = "resnet50", model_path: str | None = None) -> float:
+def quick_compare(src_image: str, target_image: str, model: str = "resnet50", model_path: str | None = None) -> float:
     """
     快速比较两张图片的相似度
 
@@ -458,7 +458,7 @@ def quick_compare(img1: str, img2: str, model: str = "resnet50", model_path: str
         相似度得分
     """
     engine = ResNetSimilarityEngine(model_name=model, use_gpu=False, model_path=model_path)
-    return engine.compare_pair(img1, img2)
+    return engine.compare_pair(src_image, target_image)
 
 
 if __name__ == "__main__":

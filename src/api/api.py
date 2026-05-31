@@ -2,15 +2,13 @@
 1. 模拟浏览器相关的操作
 """
 
-from dataclasses import dataclass
-
 from playwright.async_api import (
     async_playwright,
     Page,
-    Response,
     BrowserContext,
-    APIRequestContext,
 )
+
+from src.api.api_watch import APIWatcher
 
 # 淘宝
 TAOBAO = "https://login.taobao.com/havanaone/login/login.htm?bizName=taobao"
@@ -21,7 +19,6 @@ ALI1688_HOME = "https://www.1688.com/"
 
 
 # 配置日志
-@dataclass
 class BrowserConfig:
     def __init__(
         self, ali1688_session_path: str = "storage/session", headless: bool = True
@@ -75,6 +72,9 @@ class Playwright:
             )
         )
 
+        # 网络监听
+        self.watch_api_network = APIWatcher(self.ali1688_context)
+
         # 添加防检测脚本
         await self.ali1688_context.add_init_script("""
             Object.defineProperty(navigator, 'webdriver', {
@@ -97,43 +97,9 @@ class Playwright:
         if hasattr(self, "playwright"):
             await self.playwright.close()
 
+        self.watch_api_network.stop()
+
     # # 监控网络--------------------
-    async def _handle_watch_sku_network(response: Response):
-        # 单个 SKU 详情
-        if (
-            "mtop.1688.wosc.queryofferskuselectormodel" in response.request.url
-            and response.ok
-        ):
-            content_type = response.headers.get("content-type")
-            if "application/json" in content_type:
-                try:
-                    # 3. 在try块中安全地解析JSON
-                    data = await response.json()
-                    print("API数据:", data)
-                except Exception as e:
-                    print(f"JSON解析失败: {e}")
-
-    async def watch_sku_network(self):
-        await self.ali1688_page.once("response", self._handle_watch_sku_network)
-
-    async def _handle_watch_similarity_sku_network(response: Response):
-        # 单个 SKU 详情
-        if (
-            "mtop.relationrecommend.wirelessrecommend.recommend" in response.request.url
-            and response.ok
-        ):
-            content_type = response.headers.get("content-type")
-            if "application/json" in content_type:
-                try:
-                    # 3. 在try块中安全地解析JSON
-                    data = await response.json()
-                    print("API数据:", data)
-                except Exception as e:
-                    print(f"JSON解析失败: {e}")
-
-    async def watch_similarity_sku_network(self):
-        await self.ali1688_page.once("response", self._handle_watch_similarity_sku_network)
-
     # # 监控网络--------------------end
 
     # 基础功能

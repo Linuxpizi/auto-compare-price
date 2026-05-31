@@ -50,6 +50,7 @@ def TableRows(rows: List[SKU]) -> List[DataRow2]:
                     expand=True,
                 ),
                 ft.DataCell(ft.Text(row.match_score), expand=True),
+                ft.DataCell(ft.Text(row.match_remark), expand=True),
                 ft.DataCell(
                     ft.Text("比价完成" if row.status == "0" else "待比价"),
                     expand=True,
@@ -70,6 +71,7 @@ def Table(rows: List[SKU]) -> DataTable2:
             DataColumn2("匹配图"),  # 包括链接
             DataColumn2("原始折扣价"),
             DataColumn2("相似度"),
+            DataColumn2("备注"),
             DataColumn2("状态"),  # 0 - 待处理, 1 - 已处理
         ],
         rows=TableRows(rows),  # 添加更多行

@@ -6,6 +6,8 @@ import numpy as np
 from typing import List, Tuple
 from pathlib import Path
 import warnings
+from io import BytesIO
+from urllib.request import urlopen
 
 warnings.filterwarnings("ignore")
 
@@ -14,20 +16,21 @@ warnings.filterwarnings("ignore")
 class FeatureExtractor:
     """轻量级特征提取器"""
 
-    def __init__(self, model_name: str = "resnet50", use_gpu: bool = False):
+    def __init__(self, model_name: str = "resnet50", use_gpu: bool = False, model_path: str | None = None):
         """
         初始化特征提取器
 
         Args:
             model_name: 模型名称 (resnet50, resnet101, efficientnet_b0, vit_b_16)
             use_gpu: 是否使用GPU
+            model_path: 自定义模型权重路径，指定后从此路径加载权重而非从网络下载
         """
         self.device = torch.device(
             "cuda" if use_gpu and torch.cuda.is_available() else "cpu"
         )
 
         # 加载模型
-        self.model = self._load_model(model_name)
+        self.model = self._load_model(model_name, model_path)
         self.model = self.model.to(self.device)
         self.model.eval()
 
@@ -54,10 +57,14 @@ class FeatureExtractor:
 
         print(
             f"✅ 初始化完成 | 模型: {model_name} | 特征维度: {self.feature_dim} | 设备: {self.device}"
+            + (f" | 本地权重: {model_path}" if model_path else "")
         )
 
-    def _load_model(self, model_name: str):
+    def _load_model(self, model_name: str, model_path: str | None = None):
         """加载预训练模型"""
+        if model_path:
+            return self._load_from_local(model_name, model_path)
+
         if model_name == "resnet50":
             model = models.resnet50(weights=models.ResNet50_Weights.IMAGENET1K_V1)
             model = torch.nn.Sequential(*list(model.children())[:-1])
@@ -76,19 +83,49 @@ class FeatureExtractor:
             raise ValueError(f"不支持的模型: {model_name}")
         return model
 
+    def _load_from_local(self, model_name: str, model_path: str):
+        """从本地路径加载模型权重"""
+        if not Path(model_path).exists():
+            raise FileNotFoundError(f"模型权重文件不存在: {model_path}")
+
+        # 先创建不带权重的模型骨架
+        if model_name == "resnet50":
+            model = models.resnet50(weights=None)
+            model = torch.nn.Sequential(*list(model.children())[:-1])
+        elif model_name == "resnet101":
+            model = models.resnet101(weights=None)
+            model = torch.nn.Sequential(*list(model.children())[:-1])
+        elif model_name == "efficientnet_b0":
+            model = models.efficientnet_b0(weights=None)
+            model = torch.nn.Sequential(*list(model.children())[:-1])
+        elif model_name == "vit_b_16":
+            model = models.vit_b_16(weights=None)
+            model.heads = torch.nn.Identity()
+        else:
+            raise ValueError(f"不支持的模型: {model_name}")
+
+        # 加载本地权重
+        state_dict = torch.load(model_path, map_location=self.device, weights_only=True)
+        model.load_state_dict(state_dict, strict=False)
+        print(f"  📂 已加载本地权重: {model_path}")
+        return model
+
     @torch.no_grad()
     def extract(self, image_path: str) -> np.ndarray:
         """
         提取单张图片的特征向量
 
         Args:
-            image_path: 图片路径
+            image_path: 图片路径（本地路径或网络URL）
 
         Returns:
             特征向量 (feature_dim,)
         """
-        # 加载图片
-        img = Image.open(image_path).convert("RGB")
+        # 加载图片（支持本地路径和网络URL）
+        if image_path.startswith(("http://", "https://")):
+            img = Image.open(BytesIO(urlopen(image_path).read())).convert("RGB")
+        else:
+            img = Image.open(image_path).convert("RGB")
 
         # 预处理
         img_tensor = self.transform(img).unsqueeze(0).to(self.device)
@@ -178,15 +215,16 @@ class ResNetSimilarityEngine:
     无缓存、无索引库，每次调用实时计算
     """
 
-    def __init__(self, model_name: str = "resnet50", use_gpu: bool = False):
+    def __init__(self, model_name: str = "resnet50", use_gpu: bool = False, model_path: str | None = None):
         """
         初始化引擎
 
         Args:
             model_name: 特征提取模型 (resnet50, resnet101, efficientnet_b0, vit_b_16)
             use_gpu: 是否使用GPU加速
+            model_path: 自定义模型权重路径，指定后从此路径加载权重而非从网络下载
         """
-        self.extractor = FeatureExtractor(model_name, use_gpu)
+        self.extractor = FeatureExtractor(model_name, use_gpu, model_path)
         self.calculator = SimilarityCalculator()
 
     def compare_pair(
@@ -406,7 +444,7 @@ def main():
 
 
 # ========== 便捷函数（直接调用） ==========
-def quick_compare(img1: str, img2: str, model: str = "resnet50") -> float:
+def quick_compare(img1: str, img2: str, model: str = "resnet50", model_path: str | None = None) -> float:
     """
     快速比较两张图片的相似度
 
@@ -414,11 +452,12 @@ def quick_compare(img1: str, img2: str, model: str = "resnet50") -> float:
         img1: 图片1路径
         img2: 图片2路径
         model: 特征提取模型
+        model_path: 自定义模型权重路径
 
     Returns:
         相似度得分
     """
-    engine = ResNetSimilarityEngine(model_name=model, use_gpu=False)
+    engine = ResNetSimilarityEngine(model_name=model, use_gpu=False, model_path=model_path)
     return engine.compare_pair(img1, img2)
 
 

@@ -7,7 +7,7 @@ from PIL import Image
 
 from src.db.db import DBConn
 from src.api.api import Playwright
-from src.similarity.resnet_similarity import ResNetSimilarityEngine
+from src.api.api_watch import APIWatcher
 
 
 @ft.control
@@ -191,13 +191,14 @@ class Crawler(ft.Column):
     # 开始采集
     async def handle_start_crawler(self, e):
         self.stopping = False
+
+        # 启动网络监听
+        await self.playwright.watch_api_network.start()
+
         # 开始比价
         while True:
             sku = self.db.get_compare_sku()
             if sku:
-                # 搜图网络监控
-                await self.playwright.watch_similarity_sku_network()
-
                 # 1. 进入主页
                 await self.playwright.goto_home_page()
                 await self.await_sleep(0.1)
@@ -211,22 +212,7 @@ class Crawler(ft.Column):
 
                 # 选择一件代发
                 if self.dropshipping:
-                    
-
-                # 4. 匹配
-                engine = ResNetSimilarityEngine(model_name="resnet50", use_gpu=False)
-
-                # 2. 场景一：比较两张图片
-                print("\n" + "=" * 60)
-                print("场景一：比较两张图片")
-                print("=" * 60)
-
-                # sim = engine.compare_pair(
-                #     "src/asserts/images/c0.webp", "src/asserts/images/c3.webp", method="cosine"
-                # )
-                # print(f"✅ 余弦相似度: {sim:.4f} ({sim*100:.2f}%)")
-
-                sim2 = engine.compare_pair("./111.jpg", "./2222.webp", method="cosine")
+                    self.set_dropshipping()
 
                 if self.stopping:
                     # 模态框处理
@@ -248,7 +234,7 @@ class Crawler(ft.Column):
         # 等待页面加载完成
         await self.await_sleep(1)
         await dropshipping_item.click(delay=random())
-    
+
     # 停止采集
     async def handle_stop_crawler(self, e):
         self.stopping = True

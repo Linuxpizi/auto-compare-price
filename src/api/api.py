@@ -2,6 +2,10 @@
 1. 模拟浏览器相关的操作
 """
 
+from pathlib import Path
+from typing import List
+from dataclasses import dataclass, field
+
 from playwright.async_api import (
     async_playwright,
     Page,
@@ -9,6 +13,7 @@ from playwright.async_api import (
 )
 
 from src.api.api_watch import APIWatcher
+from src.similarity.resnet_similarity import ResNetSimilarityEngine
 
 # 淘宝
 TAOBAO = "https://login.taobao.com/havanaone/login/login.htm?bizName=taobao"
@@ -16,6 +21,51 @@ TAOBAO = "https://login.taobao.com/havanaone/login/login.htm?bizName=taobao"
 # 1688
 ALI1688_LOGIN = "https://login.1688.com/"
 ALI1688_HOME = "https://www.1688.com/"
+
+
+@dataclass
+class MatchSKU:
+    class skuSelectorBizModel:
+        class skuSelectorModel:
+            class freightInfo:
+                totalCost: float = field(default=0.0)
+
+        class skuInfoMap:
+            # "赛琳娜-灰&gt;【床笠款】150x200cm三件套": {
+            #     "canBookCount": 199,
+            #     "discountPrice": "240.00",
+            #     "multiPrice": "240.00",
+            #     "price": "240.00",
+            #     "promotionSku": false,
+            #     "saleCount": 0,
+            #     "skuId": 5974298871226,
+            #     "specAttrs": "赛琳娜-灰&gt;【床笠款】150x200cm三件套",
+            #     "specId": "429338ea9d86036e785c7fe8fc93fd7a"
+            # }
+            pass
+
+
+@dataclass
+class SimilarityItem:
+    offerPicUrl: str = field(default="")
+    odPicUrl: str = field(default="")
+    offerId: str = field(default="")
+    skuId: str = field(default="")
+    linkUrl: str = field(default="")
+
+
+@dataclass
+class Similarity:
+    data: SimilarityItem = field(default_factory={})
+
+
+# 相似图查询数据捕获
+async def catch_similarity_network(items: List[Similarity]):
+    for item in item:
+        pass
+
+
+# sku 数据捕获
 
 
 # 配置日志
@@ -72,8 +122,23 @@ class Playwright:
             )
         )
 
+        # 比对模型初始化
+        model_path = str(
+            Path(__file__).resolve().parent.parent.parent
+            / "storage"
+            / "checkpoints"
+            / "resnet50-0676ba61.pth"
+        )
+        self.similarity = ResNetSimilarityEngine(model_path=model_path)
+
         # 网络监听
-        self.watch_api_network = APIWatcher(self.ali1688_context)
+        self.watch_api_network = APIWatcher(
+            self.ali1688_context,
+            pattern_handlers={
+                "mtop.1688.wosc.queryofferskuselectormodel": self.watch_sku,
+                "mtop.relationrecommend.wirelessrecommend.recommend": self.watch_similarity_image,
+            },
+        )
 
         # 添加防检测脚本
         await self.ali1688_context.add_init_script("""
@@ -93,14 +158,19 @@ class Playwright:
         if self.ali1688_page and not self.ali1688_page.is_closed():
             await self.ali1688_page.close()
         if self.ali1688_context:
-            self.ali1688_context.close()
+            await self.ali1688_context.close()
         if hasattr(self, "playwright"):
-            await self.playwright.close()
+            await self.playwright.stop()
 
-        self.watch_api_network.stop()
+        await self.watch_api_network.stop()
 
-    # # 监控网络--------------------
-    # # 监控网络--------------------end
+    async def watch_similarity_image(self, data):
+        print("---watch_similarity_image--> ", data)
+        pass
+
+    async def watch_sku(self, data):
+        print("---------------------------> ", data)
+        pass
 
     # 基础功能
     # 1. 登录页

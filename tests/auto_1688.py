@@ -67,14 +67,13 @@ if __name__ == "__main__":
 
         await search_image_item.click(delay=random() + 0.3)
 
-        async with browser.contexts[0].expect_page() as new_page_info:
-            await search_image_item.click(delay=random())
-            new_page = await new_page_info.value
+        # async with browser.contexts[0].expect_page() as new_page_info:
+        #     await search_image_item.click(delay=random())
+        #     new_page = await new_page_info.value
 
-            # 方式1：使用 once 监听
-            new_page.expect_response()
-            new_page.wait_for_event("response", _handle_watch_similarity_sku_network)
-            # new_page.close()
+        #     # 方式1：使用 once 监听
+        #     new_page.wait_for_event("response", _handle_watch_similarity_sku_network)
+        #     # new_page.close()
 
         await asyncio.sleep(5)
         # other actions...

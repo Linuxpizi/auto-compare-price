@@ -1,13 +1,12 @@
 import io
 from asyncio import sleep
-from random import random
+from random import random, randrange
 
 import flet as ft
 from PIL import Image
 
 from src.db.db import DBConn
 from src.api.api import Playwright
-from src.api.api_watch import APIWatcher
 
 
 @ft.control
@@ -103,8 +102,8 @@ class Crawler(ft.Column):
         ]
 
     # 随机延时 1. 等待页面记载 2. 模拟
-    async def await_sleep(delay: float = 0.0):
-        sleep(random() + delay)
+    async def await_sleep(self, delay: float = 0.0):
+        await sleep(random() + delay)
 
     # 是否已登录,规则是查找是否有已登陆的标志
     # 已登录 -> True
@@ -126,8 +125,20 @@ class Crawler(ft.Column):
 
         return await logined_item.count() > 0
 
+    # 剪切板
+    async def clipboard(self, link: str):
+        try:
+            await self.playwright.ali1688_page.evaluate(
+                f"navigator.clipboard.writeText('{link}')"
+            )
+            await self.playwright.ali1688_page.keyboard.press("Control+V")
+            await self.await_sleep()
+
+        except Exception as e:
+            self.show_dialog("查找相似图", f"设置剪切板找图异常 {e}", ft.Colors.RED)
+
     # 对话框
-    def show_dialog(self, title: str, content: str, color: ft.Colors):
+    async def show_dialog(self, title: str, content: str, color: ft.Colors):
         self.page.show_dialog(
             ft.AlertDialog(
                 modal=True,
@@ -143,28 +154,21 @@ class Crawler(ft.Column):
         try:
             # 显示弹窗
             if await self.already_logined():
-                self.show_dialog("登录状态", "✅ 已登录", ft.Colors.GREEN)
+                await self.show_dialog("登录状态", "✅ 已登录", ft.Colors.GREEN)
             else:
-                self.show_dialog("登录状态", "❌ 未登录，请重新登录", ft.Colors.RED)
+                await self.show_dialog(
+                    "登录状态", "❌ 未登录，请重新登录", ft.Colors.RED
+                )
         except Exception as e:
-            self.show_dialog("登录检查", f"检查异常，请稍后重试 {e}", ft.Colors.RED)
-
-    # 剪切板
-    async def clipboard(self, link: str):
-        try:
-            await self.playwright.ali1688_page.evaluate(
-                f"navigator.clipboard.writeText('{link}')"
+            await self.show_dialog(
+                "登录检查", f"检查异常，请稍后重试 {e}", ft.Colors.RED
             )
-            await self.await_sleep()
-            await self.playwright.ali1688_page.keyboard.press("Control+V")
-        except Exception as e:
-            self.show_dialog("查找相似图", f"设置剪切板找图异常 {e}", ft.Colors.RED)
 
     # 登录
     async def handle_login_1688(self, e):
         try:
             if await self.already_logined():
-                self.show_dialog(
+                await self.show_dialog(
                     "登录状态", "✅ 已登录，不需要重新登录", ft.Colors.GREEN
                 )
                 return
@@ -186,7 +190,7 @@ class Crawler(ft.Column):
             image.show()
 
         except Exception as e:
-            self.show_dialog("登录", f"登陆异常，请稍后重试 {e}", ft.Colors.GREEN)
+            await self.show_dialog("登录", f"登陆异常，请稍后重试 {e}", ft.Colors.GREEN)
 
     # 开始采集
     async def handle_start_crawler(self, e):
@@ -201,18 +205,17 @@ class Crawler(ft.Column):
             if sku:
                 # 1. 进入主页
                 await self.playwright.goto_home_page()
-                await self.await_sleep(0.1)
+                await self.await_sleep(0.8)
 
                 # 2. 复制/粘贴
                 await self.clipboard(sku.origin_primary_image_link)
                 # 3. 搜索 //div[@class='copy-image-container']//div[@data-tracker="pasteImagePreview"]
                 # 这里操作完成后，需要捕获数据，目前采集前 12 调数据
-                await self.await_sleep(0.2)
                 await self.search_image()
 
                 # 选择一件代发
                 if self.dropshipping:
-                    self.set_dropshipping()
+                    await self.set_dropshipping()
 
                 if self.stopping:
                     # 模态框处理
@@ -227,15 +230,16 @@ class Crawler(ft.Column):
         await search_image_item.click(delay=random())
 
     async def set_dropshipping(self):
+        # 等待页面加载完成
+        await self.await_sleep(randrange(3, 5))
         dropshipping_item = self.playwright.ali1688_page.locator(
             "xpath=//div[@id='root-container']//div[starts-with(@class, 'filterBottomContainer')]//div[starts-with(@class, 'bottomFilterOption')][3]"
         )
 
-        # 等待页面加载完成
-        await self.await_sleep(1)
         await dropshipping_item.click(delay=random())
 
     # 停止采集
     async def handle_stop_crawler(self, e):
-        self.stopping = True
         # 显示模态弹窗
+        self.stopping = True
+        await self.playwright.close()

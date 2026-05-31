@@ -8,6 +8,7 @@ CREATE TABLE IF NOT EXISTS sku (
     origin_id TEXT PRIMARY KEY,
     origin_shop_name TEXT NOT NULL DEFAULT '',
     origin_primary_image_link TEXT NOT NULL DEFAULT '',
+    origin_link TEXT NOT NULL DEFAULT '',
     origin_price TEXT NOT NULL DEFAULT '',
 
     match_link TEXT NOT NULL DEFAULT '',
@@ -32,14 +33,17 @@ class SKU:
     origin_id: str = field(default="")
     origin_shop_name: str = field(default="")
     origin_primary_image_link: str = field(default="")
+    origin_link: str = field(default="")
     origin_price: str = field(default="")  # 原始优惠价
 
     # 比价采集信息
     match_link: str = field(default="")
     match_image_link: float = field(default=0.0)
     match_score: float = field(default=0.0)
-    match_remark: str = field(default="") # 价格说明 1. 物流 2. 两件优惠 3. 促销活动折扣
-    
+    match_remark: str = field(
+        default=""
+    )  # 价格说明 1. 物流 2. 两件优惠 3. 促销活动折扣
+
     status: int = field(
         default=0
     )  # 0 - 待处理, 1 - 已处理，2 - 已导出(已比对完成，导出 excel)， 99 - 删除
@@ -49,12 +53,12 @@ class SKU:
             self.origin_id,
             self.origin_shop_name,
             self.origin_primary_image_link,
+            self.origin_link,
             self.origin_price,
             self.match_link,
             self.match_image_link,
             self.match_score,
             self.match_remark,
-
         )  # 转换为元组
 
 
@@ -104,6 +108,7 @@ class DBConn:
                     origin_id,
                     origin_shop_name,
                     origin_primary_image_link,
+                    origin_link,
                     origin_price,
                     
                     match_link,
@@ -112,7 +117,7 @@ class DBConn:
                     match_remark
                 )
                 VALUES
-                    (?, ?, ?, ?, ?, ?, ?, ?)
+                    (?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(origin_id)
                 DO NOTHING
                 """,
@@ -120,6 +125,7 @@ class DBConn:
                     info.origin_id,
                     info.origin_shop_name,
                     info.origin_primary_image_link,
+                    info.origin_link,
                     info.origin_price,
                     info.match_link,
                     info.match_image_link,
@@ -146,6 +152,7 @@ class DBConn:
                     origin_id,
                     origin_shop_name,
                     origin_primary_image_link,
+                    origin_link,
                     origin_price,
                     
                     match_link,
@@ -154,7 +161,7 @@ class DBConn:
                     match_remark
                 )
                 VALUES
-                    (?, ?, ?, ?, ?, ?, ?, ?)
+                    (?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(origin_id)
                 DO NOTHING
                 """,
@@ -185,7 +192,7 @@ class DBConn:
         conn.commit()
         cursor.close()
 
-    def modify_sku_status(
+    def modify_sku_compare_status(
         self,
         origin_id: str,
     ):
@@ -206,6 +213,31 @@ class DBConn:
         conn.commit()
         cursor.close()
 
+    # 批量更新状态
+    def batch_modify_sku_export_status(self, item_ids: List[str]):
+        if not item_ids:
+            return  # 空列表不执行更新，避免 SQL 语法错误
+
+        # 去重，减少无用占位符，同时避免同一条记录被重复更新（虽然不影响结果）
+        unique_ids = list(set(item_ids))
+
+        # 根据元素数量动态生成占位符，例如 "?,?,?"
+        placeholders = ",".join("?" * len(unique_ids))
+
+        sql = f"""
+            UPDATE
+                sku
+            SET
+                status = 2
+            WHERE
+                item_id IN ({placeholders})
+        """
+
+        cursor = self.connection.cursor()
+        cursor = cursor.execute(sql, unique_ids)  # 直接传入列表，每个元素对应一个 ?
+        self.connection.commit()
+        cursor.close()
+
     def get_sku(self, origin_id: str) -> Optional[SKU]:
         cursor = self.connection.cursor()
         cursor = cursor.execute(
@@ -214,6 +246,7 @@ class DBConn:
                     origin_id,
                     origin_shop_name,
                     origin_primary_image_link,
+                    origin_link,
                     origin_price,
                     
                     match_link,
@@ -235,13 +268,17 @@ class DBConn:
             return SKU(sku[0])
         return None
 
-    def query_sku(self, limit=50000) -> List[SKU]:
+    def query_sku(
+        self,
+        limit=50000,
+    ) -> List[SKU]:
         cursor = self.connection.cursor()
         cursor = cursor.execute(f"""
             SELECT
                 origin_id,
                 origin_shop_name,
                 origin_primary_image_link,
+                origin_link,
                 origin_price,
                 
                 match_link,
@@ -253,7 +290,7 @@ class DBConn:
             FROM
                 sku
             WHERE
-                1 == 1
+                status < 2
             LIMIT {limit if limit > 0 else 1000}
             """)
         skus = cursor.fetchall()
@@ -264,12 +301,13 @@ class DBConn:
                     origin_id=row[0],
                     origin_shop_name=row[1],
                     origin_primary_image_link=row[2],
-                    origin_price=row[3],
-                    match_link=row[4],
-                    match_image_link=row[5],
-                    match_score=row[6],
-                    match_remark=row[7],
-                    status=row[8],
+                    origin_link=row[3],
+                    origin_price=row[4],
+                    match_link=row[5],
+                    match_image_link=row[6],
+                    match_score=row[7],
+                    match_remark=row[8],
+                    status=row[9],
                 )
             )
         return out
@@ -294,7 +332,7 @@ class DBConn:
 
         sku = cursor.fetchone()
         if sku:
-            return SKU(sku[0])
+            return SKU(origin_id=sku[0], origin_primary_image_link=sku[1])
         return None
 
 
